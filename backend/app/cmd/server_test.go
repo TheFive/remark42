@@ -490,6 +490,51 @@ func TestCustomProviderSourceID(t *testing.T) {
 	assert.Equal(t, "{}", customProviderSourceID(provider.UserData{}, cfg))
 }
 
+func TestCustomFieldValue(t *testing.T) {
+	// shape of https://api.openstreetmap.org/api/0.6/user/details.json after json.Unmarshal
+	data := provider.UserData{
+		"user": map[string]any{
+			"id":           float64(12345678),
+			"display_name": "mapper",
+			"img":          map[string]any{"href": "https://example.com/avatar.png"},
+			"blocked":      map[string]any{"received": map[string]any{"count": float64(0)}},
+		},
+		"sub":        "user-1",
+		"dotted.key": "flat",
+		"verified":   true,
+		"nothing":    nil,
+	}
+
+	tbl := []struct {
+		path, want string
+	}{
+		{"sub", "user-1"},
+		{"dotted.key", "flat"},
+		{"user.id", "12345678"},
+		{"user.display_name", "mapper"},
+		{"user.img.href", "https://example.com/avatar.png"},
+		{"user.blocked.received.count", "0"},
+		{"verified", "true"},
+		{"user.img", ""},
+		{"user.missing", ""},
+		{"user.id.deeper", ""},
+		{"nothing.deeper", ""},
+		{"missing", ""},
+		{"", ""},
+	}
+	for _, tt := range tbl {
+		t.Run(tt.path, func(t *testing.T) {
+			assert.Equal(t, tt.want, customFieldValue(data, tt.path))
+		})
+	}
+}
+
+func TestCustomProviderSourceID_NestedFields(t *testing.T) {
+	cfg := CustomAuthGroup{IDField: "user.id", EmailField: "email", NameField: "user.display_name", PictureField: "user.img.href"}
+	data := provider.UserData{"user": map[string]any{"id": float64(12345678), "display_name": "mapper"}}
+	assert.Equal(t, "12345678", customProviderSourceID(data, cfg))
+}
+
 func TestServerApp_InvalidCustomOAuthProviderName(t *testing.T) {
 	baseArgs := []string{
 		"--store.bolt.path=/tmp",

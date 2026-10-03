@@ -142,6 +142,20 @@ Notes:
 - `AUTH_CUSTOM_NAME` must match `^[a-z0-9][a-z0-9_-]*$` and should not conflict with built-in providers: `email`, `anonymous`, `google`, `github`, `facebook`, `yandex`, `twitter`, `microsoft`, `patreon`, `discord`, `telegram`, `dev`, `apple`.
 - If any required custom variable is missing, Remark42 will fail to start.
 - Remark42 currently supports only one custom OAuth2 provider at a time.
+- The `*_FIELD` variables accept dotted paths for nested user info, e.g. `user.img.href`. A key that literally contains a dot still takes precedence.
+
+Example for [OpenStreetMap](https://wiki.openstreetmap.org/wiki/OAuth), whose user details are nested under `user`:
+
+```
+AUTH_CUSTOM_NAME=osm
+AUTH_CUSTOM_AUTH_URL=https://www.openstreetmap.org/oauth2/authorize
+AUTH_CUSTOM_TOKEN_URL=https://www.openstreetmap.org/oauth2/token
+AUTH_CUSTOM_INFO_URL=https://api.openstreetmap.org/api/0.6/user/details.json
+AUTH_CUSTOM_SCOPES=read_prefs
+AUTH_CUSTOM_ID_FIELD=user.id
+AUTH_CUSTOM_NAME_FIELD=user.display_name
+AUTH_CUSTOM_PICTURE_FIELD=user.img.href
+```
 
 ### Telegram
 

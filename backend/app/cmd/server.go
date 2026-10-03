@@ -14,6 +14,7 @@ import (
 	"path"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -552,15 +553,15 @@ func isValidCustomProviderName(name string) bool {
 }
 
 func customProviderSourceID(data provider.UserData, cfg CustomAuthGroup) string {
-	sourceID := data.Value(cfg.IDField)
+	sourceID := customFieldValue(data, cfg.IDField)
 	if sourceID == "" {
-		sourceID = data.Value(cfg.EmailField)
+		sourceID = customFieldValue(data, cfg.EmailField)
 	}
 	if sourceID == "" {
-		sourceID = data.Value(cfg.NameField)
+		sourceID = customFieldValue(data, cfg.NameField)
 	}
 	if sourceID == "" {
-		sourceID = data.Value(cfg.PictureField)
+		sourceID = customFieldValue(data, cfg.PictureField)
 	}
 	if sourceID == "" {
 		payload, err := json.Marshal(data)
@@ -574,6 +575,36 @@ func customProviderSourceID(data provider.UserData, cfg CustomAuthGroup) string 
 		log.Printf("[WARN] custom oauth provider returned no stable user identifier fields, falling back to hashed payload")
 	}
 	return sourceID
+}
+
+// customFieldValue returns user info field value, supporting dotted paths for nested fields like "user.img.href".
+// Exact key match takes precedence, so keys containing dots keep working as before.
+func customFieldValue(data provider.UserData, path string) string {
+	if v := data.Value(path); v != "" {
+		return v
+	}
+	if !strings.Contains(path, ".") {
+		return ""
+	}
+	var cur any = map[string]any(data)
+	for part := range strings.SplitSeq(path, ".") {
+		m, ok := cur.(map[string]any)
+		if !ok {
+			return ""
+		}
+		if cur, ok = m[part]; !ok || cur == nil {
+			return ""
+		}
+	}
+	switch v := cur.(type) {
+	case string:
+		return v
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64) // %v would render large ids like 12345678 as 1.2345678e+07
+	case bool:
+		return strconv.FormatBool(v)
+	}
+	return ""
 }
 
 func (c CustomAuthGroup) isConfigured() bool {
@@ -1176,9 +1207,9 @@ func (s *ServerCommand) addAuthProviders(authenticator *auth.Service) error {
 				hashID := token.HashID(sha1.New(), sourceID) //nolint:gosec // stable provider user id hash
 				user := token.User{
 					ID:      customName + "_" + hashID,
-					Name:    data.Value(s.Auth.Custom.NameField),
-					Picture: data.Value(s.Auth.Custom.PictureField),
-					Email:   data.Value(s.Auth.Custom.EmailField),
+					Name:    customFieldValue(data, s.Auth.Custom.NameField),
+					Picture: customFieldValue(data, s.Auth.Custom.PictureField),
+					Email:   customFieldValue(data, s.Auth.Custom.EmailField),
 				}
 				if user.Name == "" {
 					user.Name = "noname_" + hashID[:4]
